@@ -9,20 +9,24 @@ export async function GET(request: Request) {
 
   if (!runId || !datasetId) {
     return NextResponse.json(
-      { error: 'runId and datasetId are required' },
+      { status: 'error', error: 'runId and datasetId are required' },
       { status: 400 }
     )
   }
 
   try {
-    const status = await getRunStatus(runId)
+    const { status } = await getRunStatus(runId)
 
     if (status === 'RUNNING' || status === 'READY') {
       return NextResponse.json({ status: 'running' })
     }
 
-    if (status === 'FAILED' || status === 'ABORTED' || status === 'TIMED-OUT') {
+    if (status === 'FAILED' || status === 'ABORTED' || status === 'TIMED-OUT' || status === 'TIMING-OUT') {
       return NextResponse.json({ status: 'failed', error: `Scraper skončil se stavem: ${status}` })
+    }
+
+    if (status !== 'SUCCEEDED') {
+      return NextResponse.json({ status: 'failed', error: `Neočekávaný stav scraperu: ${status}` })
     }
 
     const results = await getFirmyCzResults(datasetId)
@@ -38,6 +42,8 @@ export async function GET(request: Request) {
 
     const { newItems, duplicates } = await filterDuplicates(itemsToCheck)
 
+    console.log('[Scrape Status] Results:', results.length, 'withoutWeb:', withoutWeb.length, 'new:', newItems.length, 'dupes:', duplicates.length)
+
     return NextResponse.json({
       status: 'done',
       total: results.length,
@@ -50,6 +56,7 @@ export async function GET(request: Request) {
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
+    console.error('[Scrape Status] Error:', message)
     return NextResponse.json({ status: 'error', error: message }, { status: 500 })
   }
 }

@@ -16,6 +16,7 @@ import {
   Filter,
   Map,
   Clock,
+  RefreshCw,
 } from 'lucide-react'
 import { type FirmyCzResult, FIRMY_CZ_CATEGORIES, CZ_REGIONS } from '@/lib/types'
 import { formatPhone } from '@/lib/utils'
@@ -46,6 +47,7 @@ export default function ScrapePage() {
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const MAX_POLL_SECONDS = 600
 
   const clearTimers = useCallback(() => {
     if (timerRef.current) {
@@ -70,6 +72,7 @@ export default function ScrapePage() {
     setResults([])
     setWithoutWeb([])
     setSelected(new Set())
+    setElapsed(0)
 
     const locationValue = region && locality
       ? `${locality}, ${region}`
@@ -93,25 +96,63 @@ export default function ScrapePage() {
 
       const data = await res.json()
 
-      if (!res.ok) {
+      if (!res.ok || data.error) {
         setPhase('error')
-        setError(data.error ?? 'Chyba při spouštění scraperu')
+        setError(data.error ?? `Chyba serveru (${res.status})`)
         return
       }
 
       runId = data.runId
       datasetId = data.datasetId
+
+      if (!runId || !datasetId) {
+        setPhase('error')
+        setError('Scraper nevrátil platné ID. Zkuste to prosím znovu.')
+        return
+      }
+
       setPhase('running')
 
-      setElapsed(0)
       timerRef.current = setInterval(() => {
-        setElapsed((prev) => prev + 1)
+        setElapsed((prev) => {
+          const next = prev + 1
+          if (next >= MAX_POLL_SECONDS) {
+            clearTimers()
+            setPhase('error')
+            setError('Scraper běží příliš dlouho (více než 10 minut). Zkuste menší počet výsledků.')
+          }
+          return next
+        })
       }, 1000)
 
-      pollRef.current = setInterval(async () => {
+      let pollFailCount = 0
+
+      const poll = async () => {
         try {
-          const statusRes = await fetch(`/api/leads/scrape/status?runId=${runId}&datasetId=${datasetId}`)
-          const statusData = await statusRes.json()
+          const statusRes = await fetch(`/api/leads/scrape/status?runId=${encodeURIComponent(runId)}&datasetId=${encodeURIComponent(datasetId)}`)
+
+          if (!statusRes.ok) {
+            pollFailCount++
+            if (pollFailCount >= 5) {
+              clearTimers()
+              setPhase('error')
+              setError(`Status check selhal (${statusRes.status}). Zkuste to prosím znovu.`)
+            }
+            return
+          }
+
+          const statusData = await statusDataSafe(statusRes)
+          if (!statusData) {
+            pollFailCount++
+            if (pollFailCount >= 5) {
+              clearTimers()
+              setPhase('error')
+              setError('Nepodařilo se přečíst odpověď ze serveru.')
+            }
+            return
+          }
+
+          pollFailCount = 0
 
           if (statusData.status === 'running') return
 
@@ -125,32 +166,53 @@ export default function ScrapePage() {
 
           if (statusData.status === 'error') {
             setPhase('error')
-            setError(statusData.error ?? 'Neznámá chyba')
+            setError(statusData.error ?? 'Neočekávaná chyba')
             return
           }
 
-          setResults(statusData.results ?? [])
-          const noWeb = (statusData.results ?? []).filter(
+          if (statusData.status !== 'done') {
+            setPhase('error')
+            setError(`Neočekávaný stav: ${statusData.status}`)
+            return
+          }
+
+          const fetchedResults = statusData.results ?? []
+          const noWeb = fetchedResults.filter(
             (r: FirmyCzResult) => !r.webUrl || r.webUrl.trim() === ''
           )
+          setResults(fetchedResults)
           setWithoutWeb(noWeb)
           setSelected(new Set(noWeb.map((r: FirmyCzResult) => r.premiseId)))
           setImportResult({
-            total: statusData.total,
-            withoutWeb: statusData.withoutWeb,
-            newCount: statusData.newCount,
-            duplicateCount: statusData.duplicateCount,
+            total: statusData.total ?? fetchedResults.length,
+            withoutWeb: statusData.withoutWeb ?? noWeb.length,
+            newCount: statusData.newCount ?? 0,
+            duplicateCount: statusData.duplicateCount ?? 0,
           })
           setPhase('done')
         } catch (err) {
-          clearTimers()
-          setPhase('error')
-          setError(err instanceof Error ? err.message : 'Chyba při dotazování na výsledky')
+          pollFailCount++
+          if (pollFailCount >= 5) {
+            clearTimers()
+            setPhase('error')
+            setError(err instanceof Error ? err.message : 'Chyba při dotazování na výsledky')
+          }
         }
-      }, 3000)
+      }
+
+      pollRef.current = setInterval(poll, 3000)
+      poll()
     } catch (err) {
       setPhase('error')
       setError(err instanceof Error ? err.message : 'Neznámá chyba')
+    }
+  }
+
+  async function statusDataSafe(res: Response) {
+    try {
+      return await res.json()
+    } catch {
+      return null
     }
   }
 
@@ -221,6 +283,7 @@ export default function ScrapePage() {
     setWithoutWeb([])
     setSelected(new Set())
     setImportResult(null)
+    setElapsed(0)
   }
 
   const formatElapsed = (seconds: number) => {
@@ -245,7 +308,7 @@ export default function ScrapePage() {
         </div>
       </div>
 
-      {phase === 'idle' || phase === 'error' ? (
+      {(phase === 'idle' || phase === 'error') && (
         <form onSubmit={handleSearch} className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -259,7 +322,7 @@ export default function ScrapePage() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  placeholder="Klíčové slovo (např. autoservis, zubař...)"
+                  placeholder="Klíčové slovo (např. instalatér, zubař...)"
                 />
               </div>
               <p className="text-xs text-gray-400 mt-1">Nechte prázdné pro vyhledání pouze podle kategorie/kraje</p>
@@ -325,7 +388,6 @@ export default function ScrapePage() {
                   <option value={100}>100</option>
                   <option value={200}>200</option>
                   <option value={500}>500</option>
-                  <option value={1000}>1000</option>
                 </select>
               </div>
               <label className="flex items-center gap-2 cursor-pointer">
@@ -349,42 +411,56 @@ export default function ScrapePage() {
           </div>
 
           <p className="text-xs text-gray-400 mt-3">
-            Používá Apify scraper solidcode/firmy-search-scraper. Cena: $4 za 1 000 výsledků.
-            {' '}Můžete vyhledávat podle klíčového slova, kraje, města, kategorie nebo jejich kombinace.
+            Používá Apify scraper ($4 za 1 000 výsledků). Vyhledávání běží asynchronně — stránka se aktualizuje automaticky.
           </p>
 
           {error && (
             <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800 mt-4">
-              <AlertCircle size={20} />
-              <p className="text-sm">{error}</p>
+              <AlertCircle size={20} className="shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium">Chyba</p>
+                <p className="text-sm mt-0.5">{error}</p>
+              </div>
             </div>
           )}
         </form>
-      ) : phase === 'starting' || phase === 'running' ? (
+      )}
+
+      {phase === 'starting' && (
+        <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+          <Loader2 size={48} className="mx-auto text-indigo-600 animate-spin mb-4" />
+          <h2 className="text-lg font-semibold text-gray-900 mb-1">Spouštím scraper...</h2>
+          <p className="text-sm text-gray-500">Odesílám požadavek na Apify</p>
+        </div>
+      )}
+
+      {phase === 'running' && (
         <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
           <Loader2 size={48} className="mx-auto text-indigo-600 animate-spin mb-4" />
           <h2 className="text-lg font-semibold text-gray-900 mb-1">
-            {phase === 'starting' ? 'Spouštím scraper...' : 'Prohledávám Firmy.cz...'}
+            Prohledávám Firmy.cz...
           </h2>
           <p className="text-sm text-gray-500 mb-4">
-            {phase === 'starting'
-              ? 'Odesílám požadavek na Apify scraper'
-              : moment_CZ_waiting(maxResults)}
+            {maxResults <= 100
+              ? 'Stahuji výsledky, chvíli to potrvá...'
+              : maxResults <= 200
+                ? 'Stahuji výsledky, může to trvat 1–3 minuty...'
+                : 'Stahuji větší objem dat, může to trvat 3–5 minut...'}
           </p>
-          <div className="inline-flex items-center gap-2 text-sm text-gray-400">
+          <div className="inline-flex items-center gap-2 text-sm text-gray-400 mb-4">
             <Clock size={14} />
             Uplynulo: {formatElapsed(elapsed)}
           </div>
-          <div className="mt-4">
+          <div>
             <button
               onClick={resetSearch}
-              className="text-sm text-red-600 hover:text-red-700"
+              className="text-sm text-red-600 hover:text-red-700 font-medium"
             >
               Zrušit
             </button>
           </div>
         </div>
-      ) : null}
+      )}
 
       {phase === 'done' && importResult && (
         <>
@@ -456,7 +532,7 @@ export default function ScrapePage() {
                         </p>
                         <XCircle size={14} className="text-red-500 shrink-0" />
                       </div>
-                      <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                      <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 flex-wrap">
                         {result.telephone && (
                           <span className="flex items-center gap-1">
                             <Phone size={11} /> {formatPhone(result.telephone)}
@@ -495,7 +571,7 @@ export default function ScrapePage() {
             <div className="text-center py-8 bg-green-50 rounded-xl border border-green-200">
               <CheckCircle size={32} className="mx-auto text-green-600 mb-2" />
               <p className="text-sm text-green-700">
-                Všechny nalezené firmy již mají webové stránky. Žádné leady k přidání.
+                Všechny nalezené firmy ({results.length}) již mají webové stránky. Žádné leady k přidání.
               </p>
             </div>
           )}
@@ -503,27 +579,14 @@ export default function ScrapePage() {
           <div className="text-center">
             <button
               onClick={resetSearch}
-              className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+              className="inline-flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-700 font-medium"
             >
+              <RefreshCw size={14} />
               Nové vyhledávání
             </button>
           </div>
         </>
       )}
-
-      {phase === 'error' && !error && (
-        <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">
-          <AlertCircle size={20} />
-          <p className="text-sm">Neznámá chyba. Zkuste to prosím znovu.</p>
-        </div>
-      )}
     </div>
   )
-}
-
-function moment_CZ_waiting(max: number): string {
-  if (max <= 100) return 'Stahuji výsledky z Firmy.cz, chvíli to potrvá...'
-  if (max <= 200) return 'Stahuji výsledky z Firmy.cz, může to trvat 1–3 minuty...'
-  if (max <= 500) return 'Stahuji větší objem dat, může to trvat 3–5 minut...'
-  return 'Stahuji velký objem dat, může to trvat 5–10 minut...'
 }
