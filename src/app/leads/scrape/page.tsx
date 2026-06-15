@@ -36,7 +36,7 @@ export default function ScrapePage() {
   const [region, setRegion] = useState('')
   const [locality, setLocality] = useState('')
   const [category, setCategory] = useState('all')
-  const [includeDetails, setIncludeDetails] = useState(true)
+
   const [maxResults, setMaxResults] = useState(200)
   const [phase, setPhase] = useState<ScrapePhase>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -121,7 +121,6 @@ export default function ScrapePage() {
           query: query || '',
           locality: locationValue,
           category,
-          includeDetails,
           maxResults,
         }),
       })
@@ -338,7 +337,6 @@ export default function ScrapePage() {
     setCategory(log.category ?? 'all')
     setLocality(log.locality ?? '')
     setRegion(log.region ?? '')
-    setIncludeDetails(log.include_details)
     setMaxResults(log.max_results)
     setShowHistory(false)
   }
@@ -553,15 +551,7 @@ export default function ScrapePage() {
                   <option value={500}>500</option>
                 </select>
               </div>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={includeDetails}
-                  onChange={(e) => setIncludeDetails(e.target.checked)}
-                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                />
-                <span className="text-sm text-gray-700">IČO, email, DS</span>
-              </label>
+
             </div>
             <button
               type="submit"

@@ -25,7 +25,7 @@ export async function startFirmyCzScrape(params: {
     searchQuery = '',
     location = '',
     category = 'all',
-    includeDetails = true,
+    includeDetails = false,
     maxResults = 200,
   } = params
 

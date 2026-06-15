@@ -3,7 +3,7 @@ import { startFirmyCzScrape } from '@/lib/apify'
 import { getSupabase } from '@/lib/supabase'
 
 export async function POST(request: Request) {
-  const { query, locality, category, includeDetails, maxResults } = await request.json()
+  const { query, locality, category, maxResults } = await request.json()
 
   if (!query && !locality && (!category || category === 'all')) {
     return NextResponse.json(
@@ -17,7 +17,7 @@ export async function POST(request: Request) {
       searchQuery: query || '',
       location: locality || '',
       category: category || 'all',
-      includeDetails: includeDetails ?? true,
+      includeDetails: false,
       maxResults: maxResults || 200,
     })
 
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
         region,
         locality: town,
         category: category !== 'all' ? category : null,
-        include_details: includeDetails ?? true,
+        include_details: false,
         max_results: maxResults || 200,
         run_id: runId,
       })
