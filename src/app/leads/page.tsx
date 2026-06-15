@@ -20,6 +20,7 @@ const statuses: LeadStatus[] = ['novy', 'vytoceno', 'zajim', 'nezajim', 'zavolat
 
 export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([])
+  const [totalCount, setTotalCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<LeadStatus | ''>('')
@@ -40,6 +41,7 @@ export default function LeadsPage() {
       const data = await res.json()
       if (!controller.signal.aborted) {
         setLeads(data.leads ?? [])
+        setTotalCount(data.count ?? 0)
         setLoading(false)
       }
     } catch {
@@ -87,7 +89,7 @@ export default function LeadsPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Leady</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Celkem {leads.length} leadů
+            Celkem {totalCount} leadů
           </p>
         </div>
         <div className="flex gap-2">
