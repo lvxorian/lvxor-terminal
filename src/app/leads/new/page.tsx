@@ -19,6 +19,8 @@ export default function NewLeadPage() {
     obor: '',
     adresa: '',
     kontaktni_osoba: '',
+    ico: '',
+    datova_schranka: '',
     poznamky: '',
     zdroj: 'manual' as const,
   })
@@ -65,6 +67,8 @@ export default function NewLeadPage() {
       obor: form.obor || null,
       adresa: form.adresa || null,
       kontaktni_osoba: form.kontaktni_osoba || null,
+      ico: form.ico || null,
+      datova_schranka: form.datova_schranka || null,
       poznamky: form.poznamky || null,
     }
 
@@ -205,6 +209,32 @@ export default function NewLeadPage() {
               onChange={(e) => setForm({ ...form, kontaktni_osoba: e.target.value })}
               className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               placeholder="Jan Novák"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              IČO
+            </label>
+            <input
+              type="text"
+              value={form.ico}
+              onChange={(e) => setForm({ ...form, ico: e.target.value })}
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              placeholder="12345678"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Datová schránka
+            </label>
+            <input
+              type="text"
+              value={form.datova_schranka}
+              onChange={(e) => setForm({ ...form, datova_schranka: e.target.value })}
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              placeholder="x9y8z7w"
             />
           </div>
 

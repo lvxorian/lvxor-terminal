@@ -16,6 +16,8 @@ import {
 import { type Lead, type LeadStatus, STATUS_LABELS, STATUS_COLORS } from '@/lib/types'
 import { formatPhone } from '@/lib/utils'
 
+const statuses: LeadStatus[] = ['novy', 'vytoceno', 'zajim', 'nezajim', 'zavolat_zpet', 'nevolat', 'spatna_data']
+
 export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)
@@ -65,8 +67,6 @@ export default function LeadsPage() {
       prev.map((l) => (l.id === id ? { ...l, status } : l))
     )
   }
-
-  const statuses: LeadStatus[] = ['novy', 'vytoceno', 'zajim', 'nezajim', 'zavolat_zpet']
 
   return (
     <div className="space-y-6">
@@ -119,7 +119,7 @@ export default function LeadsPage() {
             <ChevronDown size={14} />
           </button>
           {showFilter && (
-            <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
+            <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
               <button
                 onClick={() => { setStatusFilter(''); setShowFilter(false) }}
                 className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
@@ -130,8 +130,17 @@ export default function LeadsPage() {
                 <button
                   key={s}
                   onClick={() => { setStatusFilter(s); setShowFilter(false) }}
-                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                 >
+                  <span className={`w-2 h-2 rounded-full ${
+                    s === 'novy' ? 'bg-blue-500' :
+                    s === 'vytoceno' ? 'bg-yellow-500' :
+                    s === 'zajim' ? 'bg-green-500' :
+                    s === 'nezajim' ? 'bg-red-500' :
+                    s === 'zavolat_zpet' ? 'bg-orange-500' :
+                    s === 'nevolat' ? 'bg-purple-500' :
+                    'bg-gray-500'
+                  }`} />
                   {STATUS_LABELS[s]}
                 </button>
               ))}

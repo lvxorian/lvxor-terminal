@@ -2,6 +2,7 @@
 
 import { useEffect, useState, Suspense, useRef, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import {
   Phone,
   PhoneOff,
@@ -17,17 +18,90 @@ import {
   MapPin,
   Building2,
   MessageSquare,
-  SkipForward,
   AlertCircle,
+  Mail,
+  Voicemail,
+  Ban,
+  GlobeLock,
+  UserX,
+  PartyPopper,
 } from 'lucide-react'
 import { formatPhone } from '@/lib/utils'
-import { type Lead, type CallScript, type VysledekVolani, STATUS_LABELS } from '@/lib/types'
+import {
+  type Lead,
+  type CallScript,
+  type VysledekVolani,
+  type LeadStatus,
+  STATUS_LABELS,
+  STATUS_COLORS,
+  VYSLEDEK_LABELS,
+  VYSLEDEK_COLORS,
+  VYSLEDEK_TO_STATUS,
+  CALL_PRIORITY_ORDER,
+} from '@/lib/types'
+
+const VYSLEDEK_ICONS: Record<VysledekVolani, React.ReactNode> = {
+  zajim: <CheckCircle size={16} />,
+  nezajim: <XCircle size={16} />,
+  zavolat_zpet: <RotateCcw size={16} />,
+  nedostupny: <PhoneOff size={16} />,
+  hlasova_schranka: <Voicemail size={16} />,
+  spatne_cislo: <XCircle size={16} />,
+  uz_maji_web: <GlobeLock size={16} />,
+  nerozhodna_osoba: <UserX size={16} />,
+  chce_info_mailem: <Mail size={16} />,
+  nevolat_znovu: <Ban size={16} />,
+}
+
+const CONFETTI_COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6']
+
+function useConfettiPieces() {
+  const [pieces] = useState(() =>
+    Array.from({ length: 60 }, (_, i) => ({
+      id: i,
+      left: Math.random() * 100,
+      delay: Math.random() * 3,
+      duration: 2 + Math.random() * 2,
+      color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+      size: 6 + Math.random() * 8,
+      rotate: Math.random() * 360,
+      isCircle: Math.random() > 0.5,
+    }))
+  )
+  return pieces
+}
+
+function Confetti() {
+  const pieces = useConfettiPieces()
+
+  return (
+    <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
+      {pieces.map((p) => (
+        <div
+          key={p.id}
+          className="absolute animate-confetti-fall"
+          style={{
+            left: `${p.left}%`,
+            top: '-20px',
+            width: `${p.size}px`,
+            height: `${p.size}px`,
+            backgroundColor: p.color,
+            borderRadius: p.isCircle ? '50%' : '2px',
+            animationDelay: `${p.delay}s`,
+            animationDuration: `${p.duration}s`,
+            transform: `rotate(${p.rotate}deg)`,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
 
 function CallModePage() {
   const searchParams = useSearchParams()
   const leadIdParam = searchParams.get('lead')
 
-  const [leads, setLeads] = useState<Lead[]>([])
+  const [allLeads, setAllLeads] = useState<Lead[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [scripts, setScripts] = useState<CallScript[]>([])
   const [activeScript, setActiveScript] = useState<CallScript | null>(null)
@@ -39,6 +113,9 @@ function CallModePage() {
   const [callDuration, setCallDuration] = useState(0)
   const [note, setNote] = useState('')
   const [showResult, setShowResult] = useState(false)
+  const [selectedVysledek, setSelectedVysledek] = useState<VysledekVolani | null>(null)
+  const [selectedStatus, setSelectedStatus] = useState<LeadStatus>('novy')
+  const [showConfetti, setShowConfetti] = useState(false)
 
   const loadController = useRef<AbortController | null>(null)
 
@@ -49,17 +126,15 @@ function CallModePage() {
 
     try {
       const [leadsRes, scriptsRes] = await Promise.all([
-        fetch(`/api/leads?status=novy`, { signal: controller.signal }),
+        fetch('/api/leads', { signal: controller.signal }),
         fetch('/api/scripts', { signal: controller.signal }),
       ])
       const leadsData = await leadsRes.json()
       const scriptsData = await scriptsRes.json()
 
       if (!controller.signal.aborted) {
-        const novyLeads = (leadsData.leads ?? []).filter(
-          (l: Lead) => l.status === 'novy' || l.status === 'zavolat_zpet'
-        )
-        setLeads(novyLeads)
+        const all = (leadsData.leads ?? []) as Lead[]
+        setAllLeads(all)
         setScripts(scriptsData ?? [])
 
         const defaultScript = (scriptsData ?? []).find((s: CallScript) => s.je_vychozi)
@@ -68,8 +143,8 @@ function CallModePage() {
           setEditedContent(defaultScript.obsah)
         }
 
-        if (leadIdParam && novyLeads.length > 0) {
-          const idx = novyLeads.findIndex((l: Lead) => l.id === leadIdParam)
+        if (leadIdParam) {
+          const idx = all.findIndex((l: Lead) => l.id === leadIdParam)
           if (idx >= 0) setCurrentIndex(idx)
         }
 
@@ -84,6 +159,17 @@ function CallModePage() {
     void loadData() // eslint-disable-line react-hooks/set-state-in-effect
   }, [loadData])
 
+  const callQueue = allLeads
+    .filter((l) => CALL_PRIORITY_ORDER.includes(l.status as LeadStatus))
+    .sort((a, b) => {
+      const prioA = CALL_PRIORITY_ORDER.indexOf(a.status as LeadStatus)
+      const prioB = CALL_PRIORITY_ORDER.indexOf(b.status as LeadStatus)
+      if (prioA !== prioB) return prioA - prioB
+      return new Date(a.vytvoreno).getTime() - new Date(b.vytvoreno).getTime()
+    })
+
+  const currentLead = callQueue[currentIndex] as Lead | undefined
+
   useEffect(() => {
     let interval: NodeJS.Timeout
     if (callActive && callStartTime) {
@@ -94,28 +180,25 @@ function CallModePage() {
     return () => clearInterval(interval)
   }, [callActive, callStartTime])
 
-  const currentLead = leads[currentIndex] as Lead | undefined
-
   function startCall() {
     setCallActive(true)
     setCallStartTime(Date.now())
     setCallDuration(0)
     setNote('')
+    setSelectedVysledek(null)
+    setSelectedStatus('novy')
     setShowResult(true)
   }
 
-  async function recordCallResult(vysledek: VysledekVolani) {
-    if (!currentLead) return
+  function selectVysledek(v: VysledekVolani) {
+    setSelectedVysledek(v)
+    setSelectedStatus(VYSLEDEK_TO_STATUS[v])
+  }
 
-    const duration = callActive ? Math.floor((Date.now() - (callStartTime ?? Date.now())) / 1000) : 0
+  async function saveAndNext() {
+    if (!currentLead || !selectedVysledek) return
 
-    let newStatus: Lead['status']
-    switch (vysledek) {
-      case 'zajim': newStatus = 'zajim'; break
-      case 'nezajim': newStatus = 'nezajim'; break
-      case 'zavolat_zpet': newStatus = 'zavolat_zpet'; break
-      case 'nedostupny': newStatus = 'vytoceno'; break
-    }
+    const duration = callDuration
 
     await fetch('/api/call-logs', {
       method: 'POST',
@@ -123,7 +206,7 @@ function CallModePage() {
       body: JSON.stringify({
         lead_id: currentLead.id,
         script_id: activeScript?.id ?? null,
-        vysledek,
+        vysledek: selectedVysledek,
         poznamka: note || null,
         delka_sekundy: duration,
       }),
@@ -132,29 +215,34 @@ function CallModePage() {
     await fetch(`/api/leads/${encodeURIComponent(currentLead.id)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus }),
+      body: JSON.stringify({ status: selectedStatus }),
     })
 
-    setCallActive(false)
-    setCallStartTime(null)
-    setCallDuration(0)
-    setShowResult(false)
-    setNote('')
+    setAllLeads((prev) => prev.map((l) => (l.id === currentLead.id ? { ...l, status: selectedStatus } : l)))
 
-    setLeads((prev) => prev.filter((_, i) => i !== currentIndex))
-    if (currentIndex >= leads.length - 1) setCurrentIndex(0)
+    resetCallState()
+
+    const nextIdx = currentIndex + 1
+    if (nextIdx >= callQueue.length) {
+      setShowConfetti(true)
+      setTimeout(() => setShowConfetti(false), 6000)
+    } else {
+      setCurrentIndex(nextIdx)
+    }
   }
 
-  function skipLead() {
-    const nextIdx = currentIndex + 1 < leads.length ? currentIndex + 1 : 0
-    setCurrentIndex(nextIdx)
-    resetCallState()
+  function goToPrev() {
+    if (currentIndex > 0) {
+      setCurrentIndex((prev) => prev - 1)
+      resetCallState()
+    }
   }
 
-  function prevLead() {
-    const prevIdx = currentIndex > 0 ? currentIndex - 1 : leads.length - 1
-    setCurrentIndex(prevIdx)
-    resetCallState()
+  function goToNext() {
+    if (currentIndex < callQueue.length - 1) {
+      setCurrentIndex((prev) => prev + 1)
+      resetCallState()
+    }
   }
 
   function resetCallState() {
@@ -163,6 +251,8 @@ function CallModePage() {
     setCallDuration(0)
     setShowResult(false)
     setNote('')
+    setSelectedVysledek(null)
+    setSelectedStatus('novy')
   }
 
   async function saveScript() {
@@ -199,52 +289,67 @@ function CallModePage() {
     )
   }
 
-  if (leads.length === 0) {
+  if (callQueue.length === 0) {
     return (
       <div className="text-center py-20">
-        <PhoneOff size={48} className="mx-auto text-gray-300 mb-4" />
-        <h2 className="text-xl font-semibold text-gray-900 mb-2">Žádné leady k volání</h2>
+        {showConfetti && <Confetti />}
+        <PartyPopper size={48} className="mx-auto text-indigo-400 mb-4" />
+        <h2 className="text-xl font-semibold text-gray-900 mb-2">
+          {allLeads.length > 0 ? 'Gratulujeme! Obvolali jste všechny leady!' : 'Žádné leady k volání'}
+        </h2>
         <p className="text-gray-500 text-sm mb-6">
-          Nejsou žádné nové leady nebo leady se statusem &quot;Zavolat zpět&quot;.
+          {allLeads.length > 0
+            ? 'Všechny dostupné leady byly obvolány. Můžete přidat nové nebo se vrátit později.'
+            : 'Nejsou žádné nové leady nebo leady k navázání kontaktu.'}
         </p>
-        <a
-          href="/leads/scrape"
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700"
-        >
-          Hledat leady na Firmy.cz
-        </a>
+        <div className="flex items-center justify-center gap-3">
+          <Link
+            href="/leads/scrape"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700"
+          >
+            Hledat leady na Firmy.cz
+          </Link>
+          <Link
+            href="/leads"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800"
+          >
+            Zobrazit všechny leady
+          </Link>
+        </div>
       </div>
     )
   }
 
   return (
     <div className="space-y-4">
+      {showConfetti && <Confetti />}
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Call Mode</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Lead {currentIndex + 1} z {leads.length}
+            Lead {currentIndex + 1} z {callQueue.length}
+            {currentLead && (
+              <span className="ml-2 text-xs">
+                ({STATUS_LABELS[currentLead.status]})
+              </span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={prevLead}
+            onClick={goToPrev}
             disabled={currentIndex === 0}
             className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            title="Předchozí lead"
           >
             <ChevronLeft size={18} />
           </button>
           <button
-            onClick={skipLead}
-            className="inline-flex items-center gap-1 px-3 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <SkipForward size={14} />
-            Přeskočit
-          </button>
-          <button
-            onClick={skipLead}
-            disabled={currentIndex >= leads.length - 1}
+            onClick={goToNext}
+            disabled={currentIndex >= callQueue.length - 1}
             className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            title="Další lead"
           >
             <ChevronRight size={18} />
           </button>
@@ -269,9 +374,7 @@ function CallModePage() {
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
-                      currentLead.status === 'novy' ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'
-                    }`}>
+                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${STATUS_COLORS[currentLead.status]}`}>
                       {STATUS_LABELS[currentLead.status]}
                     </span>
                     {!currentLead.web && (
@@ -329,6 +432,20 @@ function CallModePage() {
                       <span className="text-sm text-red-600 font-medium">Nemá web</span>
                     )}
                   </div>
+
+                  {currentLead.ico && (
+                    <div>
+                      <p className="text-xs text-gray-500 mb-0.5">IČO</p>
+                      <p className="text-sm text-gray-900">{currentLead.ico}</p>
+                    </div>
+                  )}
+
+                  {currentLead.datova_schranka && (
+                    <div>
+                      <p className="text-xs text-gray-500 mb-0.5">Datová schránka</p>
+                      <p className="text-sm text-gray-900">{currentLead.datova_schranka}</p>
+                    </div>
+                  )}
                 </div>
 
                 {currentLead.adresa && (
@@ -357,14 +474,14 @@ function CallModePage() {
                 <div className="px-5 py-4 border-t border-gray-100 bg-gray-50">
                   <button
                     onClick={startCall}
-                    className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors"
+                    className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors text-base"
                   >
                     <Phone size={18} />
                     Zahájit hovor
                   </button>
                 </div>
               ) : (
-                <div className="px-5 py-4 border-t border-gray-100 space-y-4">
+                <div className="px-5 py-4 border-t border-gray-100 space-y-5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className={`w-3 h-3 rounded-full ${callActive ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
@@ -389,34 +506,54 @@ function CallModePage() {
                   </div>
 
                   <div>
-                    <p className="text-xs text-gray-500 mb-2">Výsledek hovoru</p>
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">
+                      1. Jak dopadl hovor?
+                    </p>
                     <div className="grid grid-cols-2 gap-2">
-                      <button
-                        onClick={() => recordCallResult('zajim')}
-                        className="flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
-                      >
-                        <CheckCircle size={16} /> Zájem
-                      </button>
-                      <button
-                        onClick={() => recordCallResult('nezajim')}
-                        className="flex items-center justify-center gap-2 px-4 py-3 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
-                      >
-                        <XCircle size={16} /> Nezájem
-                      </button>
-                      <button
-                        onClick={() => recordCallResult('zavolat_zpet')}
-                        className="flex items-center justify-center gap-2 px-4 py-3 bg-orange-600 text-white text-sm font-medium rounded-lg hover:bg-orange-700 transition-colors"
-                      >
-                        <RotateCcw size={16} /> Zavolat zpět
-                      </button>
-                      <button
-                        onClick={() => recordCallResult('nedostupny')}
-                        className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-600 text-white text-sm font-medium rounded-lg hover:bg-gray-700 transition-colors"
-                      >
-                        <PhoneOff size={16} /> Nedostupný
-                      </button>
+                      {(Object.entries(VYSLEDEK_LABELS) as [VysledekVolani, string][]).map(([key, label]) => (
+                        <button
+                          key={key}
+                          onClick={() => selectVysledek(key)}
+                          className={`flex items-center gap-2 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors text-white ${
+                            selectedVysledek === key ? 'ring-2 ring-offset-2 ring-indigo-500' : ''
+                          } ${VYSLEDEK_COLORS[key]}`}
+                        >
+                          {VYSLEDEK_ICONS[key]}
+                          <span className="truncate">{label}</span>
+                        </button>
+                      ))}
                     </div>
                   </div>
+
+                  {selectedVysledek && (
+                    <div>
+                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">
+                        2. Nový status leadu
+                      </p>
+                      <select
+                        value={selectedStatus}
+                        onChange={(e) => setSelectedStatus(e.target.value as LeadStatus)}
+                        className={`w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${STATUS_COLORS[selectedStatus]}`}
+                      >
+                        {(Object.entries(STATUS_LABELS) as [LeadStatus, string][]).map(([key, label]) => (
+                          <option key={key} value={key}>{label}</option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Předvyplněno podle výsledku hovoru, můžete změnit
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedVysledek && (
+                    <button
+                      onClick={saveAndNext}
+                      className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-base"
+                    >
+                      <CheckCircle size={18} />
+                      Uložit a pokračovat
+                    </button>
+                  )}
                 </div>
               )}
             </div>

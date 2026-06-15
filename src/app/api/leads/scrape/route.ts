@@ -3,30 +3,28 @@ import { searchFirmyCz } from '@/lib/apify'
 import { filterDuplicates } from '@/lib/utils'
 
 export async function POST(request: Request) {
-  const { query, locality, maxItems } = await request.json()
+  const { query, locality, category, includeDetails, maxResults } = await request.json()
 
   if (!query) {
     return NextResponse.json({ error: 'query is required' }, { status: 400 })
   }
 
   try {
-    const results = await searchFirmyCz(query, locality || '', maxItems || 100)
+    const results = await searchFirmyCz({
+      searchQuery: query,
+      location: locality || '',
+      category: category || 'all',
+      includeDetails: includeDetails ?? true,
+      maxResults: maxResults || 200,
+    })
 
     const withoutWeb = results.filter(
-      (r) => !r.website || r.website.trim() === ''
+      (r) => !r.webUrl || r.webUrl.trim() === ''
     )
 
     const itemsToCheck = withoutWeb.map((r) => ({
       nazev_firmy: r.name,
-      telefon: r.phone,
-      email: r.email || null,
-      web: r.website || null,
-      mesto: r.city || null,
-      obor: r.category || null,
-      adresa: [r.street, r.postalCode, r.city].filter(Boolean).join(', ') || null,
-      zdroj: 'firmy_cz' as const,
-      status: 'novy' as const,
-      scrapnuto_dne: new Date().toISOString(),
+      telefon: r.telephone || null,
     }))
 
     const { newItems, duplicates } = await filterDuplicates(itemsToCheck)

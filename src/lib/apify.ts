@@ -1,4 +1,4 @@
-const APIFY_TOKEN = process.env.APIFY_TOKEN!
+const APIFY_TOKEN = process.env.APIFY_API_TOKEN!
 const ACTOR_ID = 'solidcode~firmy-search-scraper'
 const APIFY_BASE = 'https://api.apify.com/v2'
 
@@ -84,7 +84,7 @@ function normalizeItem(item: Record<string, unknown>): FirmyCzResult {
     streetAddress: item.streetAddress ? String(item.streetAddress) : null,
     locality: item.locality ? String(item.locality) : null,
     postalCode: item.postalCode ? String(item.postalCode) : null,
-    category: item.category ?? (Array.isArray(item.categories) && item.categories.length > 0 ? String(item.categories[0]) : null),
+    category: (typeof item.category === 'string' ? item.category : null) ?? (Array.isArray(item.categories) && item.categories.length > 0 ? String(item.categories[0]) : null),
     categories: Array.isArray(item.categories) ? item.categories.map(String) : null,
     ratingValue: typeof item.ratingValue === 'number' ? item.ratingValue : null,
     ratingCount: typeof item.ratingCount === 'number' ? item.ratingCount : null,

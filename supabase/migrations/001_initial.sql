@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS leads (
+CREATE TABLE leads (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   nazev_firmy TEXT NOT NULL,
   telefon TEXT,
@@ -18,14 +18,14 @@ CREATE TABLE IF NOT EXISTS leads (
   upraveno TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_leads_telefon ON leads (telefon);
-CREATE INDEX IF NOT EXISTS idx_leads_nazev_firmy ON leads (nazev_firmy);
-CREATE INDEX IF NOT EXISTS idx_leads_status ON leads (status);
-CREATE INDEX IF NOT EXISTS idx_leads_zdroj ON leads (zdroj);
-CREATE INDEX IF NOT EXISTS idx_leads_web ON leads (web);
-CREATE INDEX IF NOT EXISTS idx_leads_ico ON leads (ico);
+CREATE INDEX idx_leads_telefon ON leads (telefon);
+CREATE INDEX idx_leads_nazev_firmy ON leads (nazev_firmy);
+CREATE INDEX idx_leads_status ON leads (status);
+CREATE INDEX idx_leads_zdroj ON leads (zdroj);
+CREATE INDEX idx_leads_web ON leads (web);
+CREATE INDEX idx_leads_ico ON leads (ico);
 
-CREATE TABLE IF NOT EXISTS call_scripts (
+CREATE TABLE call_scripts (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   nazev TEXT NOT NULL,
   obsah TEXT NOT NULL,
@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS call_scripts (
   upraveno TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS call_logs (
+CREATE TABLE call_logs (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   lead_id UUID REFERENCES leads(id) ON DELETE CASCADE,
   script_id UUID REFERENCES call_scripts(id) ON DELETE SET NULL,
@@ -44,11 +44,25 @@ CREATE TABLE IF NOT EXISTS call_logs (
   volano_dne TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_call_logs_lead_id ON call_logs (lead_id);
-CREATE INDEX IF NOT EXISTS idx_call_logs_volano_dne ON call_logs (volano_dne);
+CREATE INDEX idx_call_logs_lead_id ON call_logs (lead_id);
+CREATE INDEX idx_call_logs_volano_dne ON call_logs (volano_dne);
 
 INSERT INTO call_scripts (nazev, obsah, je_vychozi) VALUES (
   'Výchozí cold call script',
-  E'Dobrý den, volám z LVXOR DESIGN.\n\nVidím, že vaše firma nemá webové stránky. V dnešní době je to obrovská příležitost, kterou necháváte přejít konkurenci.\n\nRád bych vám ukázal, jak bychom vám mohli pomoci – vytvoříme vám kompletní webové stránky včetně loga.\n\nMěli byste pár minut, abych vám to představil?',
+  'Dobrý den, volám z LVXOR DESIGN.
+
+Vidím, že vaše firma nemá webové stránky. V dnešní době je to obrovská příležitost, kterou necháváte přejít konkurenci.
+
+Rád bych vám ukázal, jak bychom vám mohli pomoci – vytvoříme vám kompletní webové stránky včetně loga.
+
+Měli byste pár minut, abych vám to představil?',
   TRUE
 );
+
+ALTER TABLE leads ENABLE ROW LEVEL SECURITY;
+ALTER TABLE call_scripts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE call_logs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow all on leads" ON leads FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all on call_scripts" ON call_scripts FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all on call_logs" ON call_logs FOR ALL USING (true) WITH CHECK (true);

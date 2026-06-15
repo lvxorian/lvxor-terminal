@@ -11,6 +11,8 @@ import {
   RotateCcw,
   TrendingUp,
   ArrowRight,
+  Ban,
+  AlertTriangle,
 } from 'lucide-react'
 import { STATUS_LABELS, type Lead } from '@/lib/types'
 import { formatPhone } from '@/lib/utils'
@@ -21,6 +23,8 @@ interface Stats {
   zajimLeads: number
   nezajimLeads: number
   zavolatZpet: number
+  nevolatLeads: number
+  spatnaData: number
   callsToday: number
   conversionsToday: number
   recentLeads: Lead[]
@@ -33,6 +37,8 @@ const statCards = [
   { key: 'zavolatZpet' as const, label: 'Zavolat zpět', icon: RotateCcw, color: 'text-orange-600', bg: 'bg-orange-50' },
   { key: 'zajimLeads' as const, label: 'Celkem zájem', icon: Star, color: 'text-emerald-600', bg: 'bg-emerald-50' },
   { key: 'nezajimLeads' as const, label: 'Celkem nezájem', icon: XCircle, color: 'text-red-600', bg: 'bg-red-50' },
+  { key: 'nevolatLeads' as const, label: 'Nevolat (DNC)', icon: Ban, color: 'text-purple-600', bg: 'bg-purple-50' },
+  { key: 'spatnaData' as const, label: 'Špatná data', icon: AlertTriangle, color: 'text-gray-600', bg: 'bg-gray-50' },
 ]
 
 export default function DashboardPage() {
@@ -51,9 +57,9 @@ export default function DashboardPage() {
     return (
       <div className="animate-pulse space-y-6">
         <div className="h-8 bg-gray-200 rounded w-48" />
-        <div className="grid grid-cols-3 gap-4">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="h-28 bg-gray-200 rounded-xl" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="h-24 bg-gray-200 rounded-xl" />
           ))}
         </div>
       </div>
@@ -89,7 +95,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map(({ key, label, icon: Icon, color, bg }) => (
           <div
             key={key}
@@ -137,13 +143,13 @@ export default function DashboardPage() {
                   </div>
                   <span
                     className={`text-xs px-2 py-1 rounded-full font-medium ${
-                      lead.status === 'novy'
-                        ? 'bg-blue-100 text-blue-800'
-                        : lead.status === 'zajim'
-                        ? 'bg-green-100 text-green-800'
-                        : lead.status === 'nezajim'
-                        ? 'bg-red-100 text-red-800'
-                        : 'bg-yellow-100 text-yellow-800'
+                      lead.status === 'novy' ? 'bg-blue-100 text-blue-800' :
+                      lead.status === 'zajim' ? 'bg-green-100 text-green-800' :
+                      lead.status === 'nezajim' ? 'bg-red-100 text-red-800' :
+                      lead.status === 'zavolat_zpet' ? 'bg-orange-100 text-orange-800' :
+                      lead.status === 'nevolat' ? 'bg-purple-100 text-purple-800' :
+                      lead.status === 'spatna_data' ? 'bg-gray-100 text-gray-800' :
+                      'bg-yellow-100 text-yellow-800'
                     }`}
                   >
                     {STATUS_LABELS[lead.status]}

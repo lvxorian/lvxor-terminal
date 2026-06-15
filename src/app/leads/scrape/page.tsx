@@ -15,14 +15,16 @@ import {
   MapPin,
   Filter,
 } from 'lucide-react'
-import type { FirmyCzResult } from '@/lib/types'
+import { type FirmyCzResult, FIRMY_CZ_CATEGORIES } from '@/lib/types'
 import { formatPhone } from '@/lib/utils'
 
 export default function ScrapePage() {
   const router = useRouter()
   const [query, setQuery] = useState('')
   const [locality, setLocality] = useState('')
-  const [maxItems, setMaxItems] = useState(100)
+  const [category, setCategory] = useState('all')
+  const [includeDetails, setIncludeDetails] = useState(true)
+  const [maxResults, setMaxResults] = useState(200)
   const [loading, setLoading] = useState(false)
   const [results, setResults] = useState<FirmyCzResult[]>([])
   const [withoutWeb, setWithoutWeb] = useState<FirmyCzResult[]>([])
@@ -51,7 +53,7 @@ export default function ScrapePage() {
       const res = await fetch('/api/leads/scrape', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, locality, maxItems }),
+        body: JSON.stringify({ query, locality, category, includeDetails, maxResults }),
       })
 
       const data = await res.json()
@@ -63,10 +65,10 @@ export default function ScrapePage() {
 
       setResults(data.results ?? [])
       const noWeb = (data.results ?? []).filter(
-        (r: FirmyCzResult) => !r.website || r.website.trim() === ''
+        (r: FirmyCzResult) => !r.webUrl || r.webUrl.trim() === ''
       )
       setWithoutWeb(noWeb)
-      setSelected(new Set(noWeb.map((r: FirmyCzResult) => r.id)))
+      setSelected(new Set(noWeb.map((r: FirmyCzResult) => r.premiseId)))
 
       setImportResult({
         total: data.total,
@@ -91,7 +93,7 @@ export default function ScrapePage() {
   }
 
   function selectAll() {
-    setSelected(new Set(withoutWeb.map((r) => r.id)))
+    setSelected(new Set(withoutWeb.map((r) => r.premiseId)))
   }
 
   function deselectAll() {
@@ -104,15 +106,17 @@ export default function ScrapePage() {
     setImporting(true)
     try {
       const itemsToImport = withoutWeb
-        .filter((r) => selected.has(r.id))
+        .filter((r) => selected.has(r.premiseId))
         .map((r) => ({
           nazev_firmy: r.name,
-          telefon: r.phone || null,
+          telefon: r.telephone || null,
           email: r.email || null,
-          web: r.website || null,
-          mesto: r.city || null,
-          obor: r.category || null,
-          adresa: [r.street, r.postalCode, r.city].filter(Boolean).join(', ') || null,
+          web: r.webUrl || null,
+          mesto: r.locality || null,
+          obor: r.category || (r.categories && r.categories.length > 0 ? r.categories[0] : null) || null,
+          adresa: [r.streetAddress, r.postalCode, r.locality].filter(Boolean).join(', ') || null,
+          ico: r.ico || null,
+          datova_schranka: r.dataBoxId || null,
           zdroj: 'firmy_cz' as const,
           status: 'novy' as const,
           scrapnuto_dne: new Date().toISOString(),
@@ -185,13 +189,30 @@ export default function ScrapePage() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between mt-4">
-          <div className="flex items-center gap-3">
-            <label className="text-sm text-gray-600">Max. výsledků:</label>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Kategorie
+            </label>
             <select
-              value={maxItems}
-              onChange={(e) => setMaxItems(Number(e.target.value))}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              {FIRMY_CZ_CATEGORIES.map((c) => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Max. výsledků
+            </label>
+            <select
+              value={maxResults}
+              onChange={(e) => setMaxResults(Number(e.target.value))}
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
               <option value={50}>50</option>
               <option value={100}>100</option>
@@ -199,6 +220,21 @@ export default function ScrapePage() {
               <option value={500}>500</option>
             </select>
           </div>
+
+          <div className="flex items-end">
+            <label className="flex items-center gap-2 cursor-pointer py-2.5">
+              <input
+                type="checkbox"
+                checked={includeDetails}
+                onChange={(e) => setIncludeDetails(e.target.checked)}
+                className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              <span className="text-sm text-gray-700">Detailní data (IČO, email, DS)</span>
+            </label>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end mt-4">
           <button
             type="submit"
             disabled={loading || !query.trim()}
@@ -210,7 +246,8 @@ export default function ScrapePage() {
         </div>
 
         <p className="text-xs text-gray-400 mt-3">
-          Používá Apify scraper pro Firmy.cz (bovi/firmy-cz-scraper). Cena: $2 za 1 000 výsledků.
+          Používá Apify scraper solidcode/firmy-search-scraper. Cena: $4 za 1 000 výsledků.
+          {includeDetails && ' Detailní data zpomalují scrapování.'}
         </p>
       </form>
 
@@ -273,15 +310,15 @@ export default function ScrapePage() {
           <div className="max-h-96 overflow-y-auto">
             {withoutWeb.map((result) => (
               <label
-                key={result.id}
+                key={result.premiseId}
                 className={`flex items-start gap-3 px-4 py-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors ${
-                  selected.has(result.id) ? 'bg-indigo-50/50' : ''
+                  selected.has(result.premiseId) ? 'bg-indigo-50/50' : ''
                 }`}
               >
                 <input
                   type="checkbox"
-                  checked={selected.has(result.id)}
-                  onChange={() => toggleSelect(result.id)}
+                  checked={selected.has(result.premiseId)}
+                  onChange={() => toggleSelect(result.premiseId)}
                   className="mt-1 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                 />
                 <div className="flex-1 min-w-0">
@@ -292,17 +329,18 @@ export default function ScrapePage() {
                     <XCircle size={14} className="text-red-500 shrink-0" />
                   </div>
                   <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
-                    {result.phone && (
+                    {result.telephone && (
                       <span className="flex items-center gap-1">
-                        <Phone size={11} /> {formatPhone(result.phone)}
+                        <Phone size={11} /> {formatPhone(result.telephone)}
                       </span>
                     )}
-                    {result.city && (
+                    {result.locality && (
                       <span className="flex items-center gap-1">
-                        <MapPin size={11} /> {result.city}
+                        <MapPin size={11} /> {result.locality}
                       </span>
                     )}
                     {result.category && <span>{result.category}</span>}
+                    {result.ico && <span>IČO: {result.ico}</span>}
                   </div>
                 </div>
               </label>

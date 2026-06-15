@@ -8,6 +8,8 @@ export async function GET() {
     { count: zajimLeads },
     { count: nezajimLeads },
     { count: zavolatZpet },
+    { count: nevolatLeads },
+    { count: spatnaData },
     { data: recentLeads },
     { data: callLogsToday },
   ] = await Promise.all([
@@ -16,6 +18,8 @@ export async function GET() {
     supabase.from('leads').select('*', { count: 'exact', head: true }).eq('status', 'zajim'),
     supabase.from('leads').select('*', { count: 'exact', head: true }).eq('status', 'nezajim'),
     supabase.from('leads').select('*', { count: 'exact', head: true }).eq('status', 'zavolat_zpet'),
+    supabase.from('leads').select('*', { count: 'exact', head: true }).eq('status', 'nevolat'),
+    supabase.from('leads').select('*', { count: 'exact', head: true }).eq('status', 'spatna_data'),
     supabase.from('leads').select('*').order('vytvoreno', { ascending: false }).limit(5),
     supabase
       .from('call_logs')
@@ -33,6 +37,8 @@ export async function GET() {
     zajimLeads: zajimLeads ?? 0,
     nezajimLeads: nezajimLeads ?? 0,
     zavolatZpet: zavolatZpet ?? 0,
+    nevolatLeads: nevolatLeads ?? 0,
+    spatnaData: spatnaData ?? 0,
     callsToday,
     conversionsToday,
     recentLeads: recentLeads ?? [],
