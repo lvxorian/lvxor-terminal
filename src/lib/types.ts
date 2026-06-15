@@ -78,6 +78,23 @@ export interface FirmyCzResult {
   detailPageUrl: string | null
 }
 
+export interface ScrapeLog {
+  id: string
+  query: string | null
+  region: string | null
+  locality: string | null
+  category: string | null
+  include_details: boolean
+  max_results: number
+  total_found: number | null
+  without_web: number | null
+  new_leads: number | null
+  duplicates: number | null
+  imported: number
+  run_id: string | null
+  created_at: string
+}
+
 export const STATUS_LABELS: Record<LeadStatus, string> = {
   novy: 'Nový',
   vytoceno: 'Vytočeno',

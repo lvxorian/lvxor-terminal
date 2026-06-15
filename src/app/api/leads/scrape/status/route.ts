@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server'
 import { getRunStatus, getFirmyCzResults } from '@/lib/apify'
 import { filterDuplicates } from '@/lib/utils'
+import { getSupabase } from '@/lib/supabase'
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const runId = searchParams.get('runId')
   const datasetId = searchParams.get('datasetId')
+  const logId = searchParams.get('logId')
 
   if (!runId || !datasetId) {
     return NextResponse.json(
@@ -44,6 +46,23 @@ export async function GET(request: Request) {
 
     console.log('[Scrape Status] Results:', results.length, 'withoutWeb:', withoutWeb.length, 'new:', newItems.length, 'dupes:', duplicates.length)
 
+    if (logId) {
+      const supabase = getSupabase()
+      const { error: updateError } = await supabase
+        .from('scrape_logs')
+        .update({
+          total_found: results.length,
+          without_web: withoutWeb.length,
+          new_leads: newItems.length,
+          duplicates: duplicates.length,
+        })
+        .eq('id', logId)
+
+      if (updateError) {
+        console.error('[Scrape Status] Failed to update scrape_log:', updateError)
+      }
+    }
+
     return NextResponse.json({
       status: 'done',
       total: results.length,
@@ -53,6 +72,7 @@ export async function GET(request: Request) {
       results,
       newItems,
       duplicates,
+      logId,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'

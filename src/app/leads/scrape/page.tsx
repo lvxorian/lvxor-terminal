@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -17,9 +17,16 @@ import {
   Map,
   Clock,
   RefreshCw,
+  History,
+  ChevronDown,
+  ChevronUp,
+  Calendar,
+  SortAsc,
+  SortDesc,
+  Eye,
 } from 'lucide-react'
-import { type FirmyCzResult, FIRMY_CZ_CATEGORIES, CZ_REGIONS } from '@/lib/types'
-import { formatPhone } from '@/lib/utils'
+import { type FirmyCzResult, type ScrapeLog, FIRMY_CZ_CATEGORIES, CZ_REGIONS } from '@/lib/types'
+import { formatPhone, formatDate } from '@/lib/utils'
 
 type ScrapePhase = 'idle' | 'starting' | 'running' | 'done' | 'error'
 
@@ -44,6 +51,13 @@ export default function ScrapePage() {
     newCount: number
     duplicateCount: number
   } | null>(null)
+  const [logId, setLogId] = useState<string | null>(null)
+
+  const [showHistory, setShowHistory] = useState(false)
+  const [logs, setLogs] = useState<ScrapeLog[]>([])
+  const [logsLoading, setLogsLoading] = useState(false)
+  const [logsFilter, setLogsFilter] = useState('')
+  const [logsSort, setLogsSort] = useState<'newest' | 'oldest'>('newest')
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -60,6 +74,23 @@ export default function ScrapePage() {
     }
   }, [])
 
+  async function fetchLogs() {
+    setLogsLoading(true)
+    try {
+      const res = await fetch('/api/scrape-logs?limit=50')
+      const data = await res.json()
+      if (data.data) setLogs(data.data)
+    } catch {
+      // silently fail
+    } finally {
+      setLogsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (showHistory) fetchLogs()
+  }, [showHistory])
+
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault()
 
@@ -73,6 +104,7 @@ export default function ScrapePage() {
     setWithoutWeb([])
     setSelected(new Set())
     setElapsed(0)
+    setLogId(null)
 
     const locationValue = region && locality
       ? `${locality}, ${region}`
@@ -105,6 +137,8 @@ export default function ScrapePage() {
       runId = data.runId
       datasetId = data.datasetId
 
+      if (data.logId) setLogId(data.logId)
+
       if (!runId || !datasetId) {
         setPhase('error')
         setError('Scraper nevrátil platné ID. Zkuste to prosím znovu.')
@@ -129,7 +163,8 @@ export default function ScrapePage() {
 
       const poll = async () => {
         try {
-          const statusRes = await fetch(`/api/leads/scrape/status?runId=${encodeURIComponent(runId)}&datasetId=${encodeURIComponent(datasetId)}`)
+          const statusUrl = `/api/leads/scrape/status?runId=${encodeURIComponent(runId)}&datasetId=${encodeURIComponent(datasetId)}${data.logId ? `&logId=${encodeURIComponent(data.logId)}` : ''}`
+          const statusRes = await fetch(statusUrl)
 
           if (!statusRes.ok) {
             pollFailCount++
@@ -190,6 +225,7 @@ export default function ScrapePage() {
             duplicateCount: statusData.duplicateCount ?? 0,
           })
           setPhase('done')
+          if (showHistory) fetchLogs()
         } catch (err) {
           pollFailCount++
           if (pollFailCount >= 5) {
@@ -269,6 +305,14 @@ export default function ScrapePage() {
         return
       }
 
+      if (logId) {
+        fetch('/api/leads/scrape/log-import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ logId, imported: selected.size }),
+        }).catch(() => {})
+      }
+
       router.push('/leads')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Neznámá chyba')
@@ -286,6 +330,17 @@ export default function ScrapePage() {
     setSelected(new Set())
     setImportResult(null)
     setElapsed(0)
+    setLogId(null)
+  }
+
+  function fillFormFromLog(log: ScrapeLog) {
+    setQuery(log.query ?? '')
+    setCategory(log.category ?? 'all')
+    setLocality(log.locality ?? '')
+    setRegion(log.region ?? '')
+    setIncludeDetails(log.include_details)
+    setMaxResults(log.max_results)
+    setShowHistory(false)
   }
 
   const formatElapsed = (seconds: number) => {
@@ -296,19 +351,125 @@ export default function ScrapePage() {
 
   const canSearch = !!(query.trim() || region || locality || (category && category !== 'all'))
 
+  const filteredLogs = logs
+    .filter((log) => {
+      if (!logsFilter) return true
+      const needle = logsFilter.toLowerCase()
+      return (
+        (log.query ?? '').toLowerCase().includes(needle) ||
+        (log.locality ?? '').toLowerCase().includes(needle) ||
+        (log.region ?? '').toLowerCase().includes(needle) ||
+        (log.category ?? '').toLowerCase().includes(needle)
+      )
+    })
+    .sort((a, b) => {
+      const cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      return logsSort === 'newest' ? -cmp : cmp
+    })
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center gap-3">
-        <Link href="/leads" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-          <ArrowLeft size={20} className="text-gray-500" />
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Hledat na Firmy.cz</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            Najdi firmy bez webu a přidej je jako leady
-          </p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Link href="/leads" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+            <ArrowLeft size={20} className="text-gray-500" />
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Hledat na Firmy.cz</h1>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Najdi firmy bez webu a přidej je jako leady
+            </p>
+          </div>
         </div>
+        <button
+          onClick={() => setShowHistory(!showHistory)}
+          className={`inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
+            showHistory
+              ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+              : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+          }`}
+        >
+          <History size={16} />
+          Historie hledání
+          {showHistory ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </button>
       </div>
+
+      {showHistory && (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between gap-3 flex-wrap">
+            <div className="relative flex-1 max-w-xs">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={logsFilter}
+                onChange={(e) => setLogsFilter(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="Filtrovat historii..."
+              />
+            </div>
+            <button
+              onClick={() => setLogsSort(logsSort === 'newest' ? 'oldest' : 'newest')}
+              className="inline-flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900"
+            >
+              {logsSort === 'newest' ? <SortDesc size={14} /> : <SortAsc size={14} />}
+              {logsSort === 'newest' ? 'Nejnovější' : 'Nejstarší'}
+            </button>
+          </div>
+
+          {logsLoading ? (
+            <div className="p-8 text-center">
+              <Loader2 size={24} className="mx-auto text-indigo-600 animate-spin" />
+            </div>
+          ) : filteredLogs.length === 0 ? (
+            <div className="p-8 text-center text-sm text-gray-500">
+              {logs.length === 0 ? 'Zatím žádná historie vyhledávání.' : 'Žádné záznamy neodpovídají filtru.'}
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-100 max-h-80 overflow-y-auto">
+              {filteredLogs.map((log) => (
+                <div
+                  key={log.id}
+                  className="px-4 py-3 hover:bg-gray-50 transition-colors flex items-start justify-between gap-4"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium text-gray-900 truncate">
+                      {log.query || (log.category ? FIRMY_CZ_CATEGORIES.find(c => c.value === log.category)?.label || log.category : 'Všechny obory')}
+                    </div>
+                    <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 flex-wrap">
+                      <span className="flex items-center gap-1 whitespace-nowrap">
+                        <Calendar size={11} />
+                        {formatDate(log.created_at)}
+                      </span>
+                      {log.locality && (
+                        <span className="flex items-center gap-1">
+                          <MapPin size={11} /> {log.locality}
+                        </span>
+                      )}
+                      {log.total_found !== null && (
+                        <span>Celkem: <strong>{log.total_found}</strong></span>
+                      )}
+                      {log.without_web !== null && (
+                        <span>Bez webu: <strong>{log.without_web}</strong></span>
+                      )}
+                      {log.imported > 0 && (
+                        <span className="text-green-600 font-medium">Importováno: {log.imported}</span>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => fillFormFromLog(log)}
+                    className="shrink-0 p-2 hover:bg-indigo-50 rounded-lg transition-colors group"
+                    title="Použít toto hledání"
+                  >
+                    <Eye size={16} className="text-gray-400 group-hover:text-indigo-600" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {(phase === 'idle' || phase === 'error') && (
         <form onSubmit={handleSearch} className="bg-white rounded-xl border border-gray-200 p-6">
