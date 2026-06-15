@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { getSupabase } from '@/lib/supabase'
 
 export async function GET() {
+  const supabase = getSupabase()
   const [
     { count: totalLeads },
     { count: newLeads },

@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+import { getSupabase } from './supabase'
 import type { Lead } from './types'
 
 function normalizePhone(phone: string | null): string | null {
@@ -18,6 +18,7 @@ export async function findDuplicate(
   nazev_firmy: string,
   telefon: string | null
 ): Promise<Lead | null> {
+  const supabase = getSupabase()
   if (telefon) {
     const normalized = normalizePhone(telefon)
     if (normalized && normalized.length >= 7) {

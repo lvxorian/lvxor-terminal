@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { getSupabase } from '@/lib/supabase'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -9,6 +9,7 @@ export async function PUT(
 ) {
   const { id } = await context.params
   const updateData = await request.json()
+  const supabase = getSupabase()
 
   const { data, error } = await supabase
     .from('leads')
@@ -29,6 +30,7 @@ export async function DELETE(
   context: RouteContext
 ) {
   const { id } = await context.params
+  const supabase = getSupabase()
 
   const { error } = await supabase.from('leads').delete().eq('id', id)
 

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { getSupabase } from '@/lib/supabase'
 import type { LeadStatus } from '@/lib/types'
 
 export async function GET(request: Request) {
@@ -7,6 +7,7 @@ export async function GET(request: Request) {
   const status = searchParams.get('status') as LeadStatus | null
   const search = searchParams.get('search')
 
+  const supabase = getSupabase()
   let query = supabase
     .from('leads')
     .select('*', { count: 'exact' })
@@ -34,6 +35,7 @@ export async function POST(request: Request) {
 
   const items = Array.isArray(body) ? body : [body]
 
+  const supabase = getSupabase()
   const { data, error } = await supabase
     .from('leads')
     .insert(items)

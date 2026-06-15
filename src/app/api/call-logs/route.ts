@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { getSupabase } from '@/lib/supabase'
 
 export async function POST(request: Request) {
   const body = await request.json()
+  const supabase = getSupabase()
 
   if (!body.lead_id || !body.vysledek) {
     return NextResponse.json(
