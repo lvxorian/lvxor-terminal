@@ -157,7 +157,7 @@ export default function DashboardPage() {
                     <p className="text-sm font-medium text-gray-900 truncate">
                       {lead.nazev_firmy}
                     </p>
-                    <p className="text-xs text-gray-500">
+<p className="text-xs text-gray-500 whitespace-nowrap">
                       {formatPhone(lead.telefon)}
                       {lead.mesto && <span> · {lead.mesto}</span>}
                       {lead.rating !== null && lead.rating !== undefined && <span> · {formatRating(lead.rating, lead.rating_count)}</span>}

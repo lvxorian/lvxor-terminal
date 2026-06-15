@@ -400,7 +400,7 @@ function CallModePage() {
                     {currentLead.telefon ? (
                       <a
                         href={`tel:${phoneForTel(currentLead.telefon)}`}
-                        className="text-sm font-medium text-indigo-600 hover:text-indigo-700 flex items-center gap-1.5"
+                        className="text-sm font-medium text-indigo-600 hover:text-indigo-700 flex items-center gap-1.5 whitespace-nowrap"
                       >
                         <Phone size={14} />
                         {formatPhone(currentLead.telefon)}

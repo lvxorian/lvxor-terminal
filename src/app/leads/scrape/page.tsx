@@ -536,7 +536,7 @@ export default function ScrapePage() {
                       </div>
                       <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 flex-wrap">
                         {result.telephone && (
-                          <span className="flex items-center gap-1">
+                          <span className="flex items-center gap-1 whitespace-nowrap">
                             <Phone size={11} /> {formatPhone(result.telephone)}
                           </span>
                         )}

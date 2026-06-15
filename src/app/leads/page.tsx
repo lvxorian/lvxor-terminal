@@ -227,7 +227,7 @@ export default function LeadsPage() {
                         {lead.telefon ? (
                           <a
                             href={`tel:${phoneForTel(lead.telefon)}`}
-                            className="text-sm text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+                            className="text-sm text-indigo-600 hover:text-indigo-700 flex items-center gap-1 whitespace-nowrap"
                           >
                             <Phone size={13} />
                             {formatPhone(lead.telefon)}
@@ -326,7 +326,7 @@ export default function LeadsPage() {
                   {lead.telefon && (
                     <a
                       href={`tel:${phoneForTel(lead.telefon)}`}
-                      className="flex items-center gap-1 text-indigo-600 hover:text-indigo-700"
+                      className="flex items-center gap-1 text-indigo-600 hover:text-indigo-700 whitespace-nowrap"
                     >
                       <Phone size={12} />
                       {formatPhone(lead.telefon)}
