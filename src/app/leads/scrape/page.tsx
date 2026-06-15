@@ -24,6 +24,7 @@ import {
   SortAsc,
   SortDesc,
   Eye,
+  Trash2,
 } from 'lucide-react'
 import { type FirmyCzResult, type ScrapeLog, FIRMY_CZ_CATEGORIES, CZ_REGIONS } from '@/lib/types'
 import { formatPhone, formatDate } from '@/lib/utils'
@@ -73,6 +74,18 @@ export default function ScrapePage() {
       pollRef.current = null
     }
   }, [])
+
+  async function handleDeleteLog(id: string) {
+    if (!confirm('Opravdu smazat tento záznam historie?')) return
+    try {
+      const res = await fetch(`/api/scrape-logs?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+      if (res.ok) {
+        setLogs((prev) => prev.filter((l) => l.id !== id))
+      }
+    } catch {
+      // silently fail
+    }
+  }
 
   async function fetchLogs() {
     setLogsLoading(true)
@@ -453,15 +466,27 @@ export default function ScrapePage() {
                       {log.imported > 0 && (
                         <span className="text-green-600 font-medium">Importováno: {log.imported}</span>
                       )}
+                      {log.max_results > 0 && (
+                        <span>Max: <strong>{log.max_results}</strong></span>
+                      )}
                     </div>
                   </div>
-                  <button
-                    onClick={() => fillFormFromLog(log)}
-                    className="shrink-0 p-2 hover:bg-indigo-50 rounded-lg transition-colors group"
-                    title="Použít toto hledání"
-                  >
-                    <Eye size={16} className="text-gray-400 group-hover:text-indigo-600" />
-                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => fillFormFromLog(log)}
+                      className="p-2 hover:bg-indigo-50 rounded-lg transition-colors group"
+                      title="Použít toto hledání"
+                    >
+                      <Eye size={16} className="text-gray-400 group-hover:text-indigo-600" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteLog(log.id)}
+                      className="p-2 hover:bg-red-50 rounded-lg transition-colors group"
+                      title="Smazat záznam"
+                    >
+                      <Trash2 size={16} className="text-gray-400 group-hover:text-red-600" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -549,6 +574,7 @@ export default function ScrapePage() {
                   <option value={100}>100</option>
                   <option value={200}>200</option>
                   <option value={500}>500</option>
+                  <option value={1000}>1 000</option>
                 </select>
               </div>
 
