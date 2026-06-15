@@ -44,12 +44,21 @@ const statCards = [
 export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/stats')
       .then((r) => r.json())
-      .then((data) => setStats(data))
-      .catch(console.error)
+      .then((data) => {
+        if (data.error) {
+          setError(data.error)
+        } else {
+          setStats(data)
+        }
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : 'Chyba připojení')
+      })
       .finally(() => setLoading(false))
   }, [])
 
@@ -66,8 +75,19 @@ export default function DashboardPage() {
     )
   }
 
-  if (!stats) {
-    return <div className="text-red-600">Chyba při načítání statistik.</div>
+  if (error || !stats) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-xl p-6">
+        <p className="text-red-800 font-medium">Chyba při načítání statistik</p>
+        <p className="text-red-600 text-sm mt-1">{error ?? 'Neznámá chyba'}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-3 px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
+        >
+          Zkusit znovu
+        </button>
+      </div>
+    )
   }
 
   return (
