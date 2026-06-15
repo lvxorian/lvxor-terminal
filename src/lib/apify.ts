@@ -2,23 +2,25 @@ const APIFY_TOKEN = process.env.APIFY_API_TOKEN!
 const ACTOR_ID = 'solidcode~firmy-search-scraper'
 const APIFY_BASE = 'https://api.apify.com/v2'
 
+import type { FirmyCzResult } from './types'
+
+type ApifyRunStatus = 'READY' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'ABORTED' | 'TIMED-OUT'
+
 interface ApifyRunResponse {
   data: {
     id: string
     defaultDatasetId: string
-    status: string
+    status: ApifyRunStatus
   }
 }
 
-import type { FirmyCzResult } from './types'
-
-export async function searchFirmyCz(params: {
+export async function startFirmyCzScrape(params: {
   searchQuery?: string
   location?: string
   category?: string
   includeDetails?: boolean
   maxResults?: number
-}): Promise<FirmyCzResult[]> {
+}): Promise<{ runId: string; datasetId: string }> {
   const {
     searchQuery = '',
     location = '',
@@ -47,35 +49,41 @@ export async function searchFirmyCz(params: {
   })
 
   if (!response.ok) {
-    throw new Error(`Apify run failed: ${response.status} ${response.statusText}`)
+    const text = await response.text()
+    throw new Error(`Apify run failed: ${response.status} ${response.statusText} — ${text}`)
   }
 
   const runData: ApifyRunResponse = await response.json()
-  const datasetId = runData.data.defaultDatasetId
-
-  return pollDataset(datasetId)
+  return {
+    runId: runData.data.id,
+    datasetId: runData.data.defaultDatasetId,
+  }
 }
 
-async function pollDataset(
-  datasetId: string,
-  maxAttempts: number = 120,
-  intervalMs: number = 3000
-): Promise<FirmyCzResult[]> {
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const url = `${APIFY_BASE}/datasets/${datasetId}/items?token=${APIFY_TOKEN}&status=ready&clean=true`
-    const response = await fetch(url)
+export async function getRunStatus(runId: string): Promise<ApifyRunStatus> {
+  const url = `${APIFY_BASE}/actor-runs/${runId}?token=${APIFY_TOKEN}`
+  const response = await fetch(url)
 
-    if (response.ok) {
-      const items = await response.json()
-      if (Array.isArray(items) && items.length > 0) {
-        return items.map(normalizeItem)
-      }
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, intervalMs))
+  if (!response.ok) {
+    throw new Error(`Failed to check run status: ${response.status}`)
   }
 
-  throw new Error('Timeout waiting for Apify results')
+  const data: ApifyRunResponse = await response.json()
+  return data.data.status
+}
+
+export async function getFirmyCzResults(datasetId: string): Promise<FirmyCzResult[]> {
+  const url = `${APIFY_BASE}/datasets/${datasetId}/items?token=${APIFY_TOKEN}&status=ready&clean=true`
+  const response = await fetch(url)
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch dataset: ${response.status}`)
+  }
+
+  const items = await response.json()
+  if (!Array.isArray(items)) return []
+
+  return items.map(normalizeItem)
 }
 
 function normalizeItem(item: Record<string, unknown>): FirmyCzResult {
