@@ -5,13 +5,16 @@ import { filterDuplicates } from '@/lib/utils'
 export async function POST(request: Request) {
   const { query, locality, category, includeDetails, maxResults } = await request.json()
 
-  if (!query) {
-    return NextResponse.json({ error: 'query is required' }, { status: 400 })
+  if (!query && !locality && (!category || category === 'all')) {
+    return NextResponse.json(
+      { error: 'Zadejte alespoň vyhledávaný výraz, lokalitu/kraj nebo kategorii' },
+      { status: 400 }
+    )
   }
 
   try {
     const results = await searchFirmyCz({
-      searchQuery: query,
+      searchQuery: query || '',
       location: locality || '',
       category: category || 'all',
       includeDetails: includeDetails ?? true,

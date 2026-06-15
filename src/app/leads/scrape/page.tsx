@@ -14,13 +14,15 @@ import {
   Phone,
   MapPin,
   Filter,
+  Map,
 } from 'lucide-react'
-import { type FirmyCzResult, FIRMY_CZ_CATEGORIES } from '@/lib/types'
+import { type FirmyCzResult, FIRMY_CZ_CATEGORIES, CZ_REGIONS } from '@/lib/types'
 import { formatPhone } from '@/lib/utils'
 
 export default function ScrapePage() {
   const router = useRouter()
   const [query, setQuery] = useState('')
+  const [region, setRegion] = useState('')
   const [locality, setLocality] = useState('')
   const [category, setCategory] = useState('all')
   const [includeDetails, setIncludeDetails] = useState(true)
@@ -38,9 +40,11 @@ export default function ScrapePage() {
     duplicateCount: number
   } | null>(null)
 
+  const canSearch = !!(query.trim() || region || locality || (category && category !== 'all'))
+
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault()
-    if (!query.trim()) return
+    if (!canSearch) return
 
     setLoading(true)
     setError(null)
@@ -49,11 +53,21 @@ export default function ScrapePage() {
     setWithoutWeb([])
     setSelected(new Set())
 
+    const locationValue = region && locality
+      ? `${locality}, ${region}`
+      : region || locality || ''
+
     try {
       const res = await fetch('/api/leads/scrape', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, locality, category, includeDetails, maxResults }),
+        body: JSON.stringify({
+          query: query || '',
+          locality: locationValue,
+          category,
+          includeDetails,
+          maxResults,
+        }),
       })
 
       const data = await res.json()
@@ -157,21 +171,39 @@ export default function ScrapePage() {
       </div>
 
       <form onSubmit={handleSearch} className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="md:col-span-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Hledaný výraz *
+              Hledaný výraz
             </label>
             <div className="relative">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
-                required
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                placeholder="Zadejte klíčové slovo (např. restaurace, autoservis, zubař)"
+                placeholder="Klíčové slovo (např. autoservis, zubař...)"
               />
+            </div>
+            <p className="text-xs text-gray-400 mt-1">Nechte prázdné pro vyhledání pouze podle kategorie/kraje</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Kraj
+            </label>
+            <div className="relative">
+              <Map size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <select
+                value={region}
+                onChange={(e) => setRegion(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent appearance-none"
+              >
+                {CZ_REGIONS.map((r) => (
+                  <option key={r.value} value={r.value}>{r.label}</option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -184,15 +216,13 @@ export default function ScrapePage() {
               value={locality}
               onChange={(e) => setLocality(e.target.value)}
               className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              placeholder="Praha, Brno... (volitelné)"
+              placeholder="Konkrétní město (např. Brno, Ostrava)"
             />
           </div>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Kategorie
+              Kategorie oboru
             </label>
             <select
               value={category}
@@ -204,40 +234,37 @@ export default function ScrapePage() {
               ))}
             </select>
           </div>
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Max. výsledků
-            </label>
-            <select
-              value={maxResults}
-              onChange={(e) => setMaxResults(Number(e.target.value))}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-              <option value={200}>200</option>
-              <option value={500}>500</option>
-            </select>
-          </div>
-
-          <div className="flex items-end">
-            <label className="flex items-center gap-2 cursor-pointer py-2.5">
+        <div className="flex items-center justify-between mt-4">
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-600">Max:</label>
+              <select
+                value={maxResults}
+                onChange={(e) => setMaxResults(Number(e.target.value))}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value={200}>200</option>
+                <option value={500}>500</option>
+                <option value={1000}>1000</option>
+              </select>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={includeDetails}
                 onChange={(e) => setIncludeDetails(e.target.checked)}
                 className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
               />
-              <span className="text-sm text-gray-700">Detailní data (IČO, email, DS)</span>
+              <span className="text-sm text-gray-700">IČO, email, DS</span>
             </label>
           </div>
-        </div>
-
-        <div className="flex items-center justify-end mt-4">
           <button
             type="submit"
-            disabled={loading || !query.trim()}
+            disabled={loading || !canSearch}
             className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
@@ -247,7 +274,7 @@ export default function ScrapePage() {
 
         <p className="text-xs text-gray-400 mt-3">
           Používá Apify scraper solidcode/firmy-search-scraper. Cena: $4 za 1 000 výsledků.
-          {includeDetails && ' Detailní data zpomalují scrapování.'}
+          {' '}Můžete vyhledávat podle klíčového slova, kraje, města, kategorie nebo jejich kombinace.
         </p>
       </form>
 

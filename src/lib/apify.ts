@@ -13,19 +13,23 @@ interface ApifyRunResponse {
 import type { FirmyCzResult } from './types'
 
 export async function searchFirmyCz(params: {
-  searchQuery: string
+  searchQuery?: string
   location?: string
   category?: string
   includeDetails?: boolean
   maxResults?: number
 }): Promise<FirmyCzResult[]> {
   const {
-    searchQuery,
+    searchQuery = '',
     location = '',
     category = 'all',
     includeDetails = true,
     maxResults = 200,
   } = params
+
+  if (!searchQuery && !location && category === 'all') {
+    throw new Error('Zadejte alespoň vyhledávaný výraz, lokalitu nebo kategorii')
+  }
 
   const startUrl = `${APIFY_BASE}/acts/${ACTOR_ID}/runs?token=${APIFY_TOKEN}`
 

@@ -157,3 +157,21 @@ export const FIRMY_CZ_CATEGORIES = [
   { value: 'vse-pro-firmy', label: 'Vše pro firmy' },
   { value: 'velkoobchod-vyroba', label: 'Velkoobchod & Výroba' },
 ]
+
+export const CZ_REGIONS = [
+  { value: '', label: 'Celá ČR' },
+  { value: 'Praha', label: 'Praha' },
+  { value: 'Středočeský kraj', label: 'Středočeský kraj' },
+  { value: 'Jihočeský kraj', label: 'Jihočeský kraj' },
+  { value: 'Plzeňský kraj', label: 'Plzeňský kraj' },
+  { value: 'Karlovarský kraj', label: 'Karlovarský kraj' },
+  { value: 'Ústecký kraj', label: 'Ústecký kraj' },
+  { value: 'Liberecký kraj', label: 'Liberecký kraj' },
+  { value: 'Královéhradecký kraj', label: 'Královéhradecký kraj' },
+  { value: 'Pardubický kraj', label: 'Pardubický kraj' },
+  { value: 'Vysočina', label: 'Vysočina' },
+  { value: 'Jihomoravský kraj', label: 'Jihomoravský kraj' },
+  { value: 'Olomoucký kraj', label: 'Olomoucký kraj' },
+  { value: 'Zlínský kraj', label: 'Zlínský kraj' },
+  { value: 'Moravskoslezský kraj', label: 'Moravskoslezský kraj' },
+]
