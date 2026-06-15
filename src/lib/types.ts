@@ -24,6 +24,8 @@ export interface Lead {
   kontaktni_osoba: string | null
   ico: string | null
   datova_schranka: string | null
+  rating: number | null
+  rating_count: number | null
   zdroj: LeadZdroj
   status: LeadStatus
   poznamky: string | null

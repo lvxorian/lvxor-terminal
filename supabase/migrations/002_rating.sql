@@ -1,0 +1,2 @@
+ALTER TABLE leads ADD COLUMN rating NUMERIC(2,1);
+ALTER TABLE leads ADD COLUMN rating_count INTEGER;

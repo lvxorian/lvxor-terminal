@@ -15,7 +15,7 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 import { STATUS_LABELS, type Lead } from '@/lib/types'
-import { formatPhone } from '@/lib/utils'
+import { formatPhone, formatRating } from '@/lib/utils'
 
 interface Stats {
   totalLeads: number
@@ -92,22 +92,23 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-sm text-gray-500 mt-1">Přehled LVXOR DESIGN Terminal</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           <Link
             href="/leads/new"
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+            className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
           >
             <UserPlus size={16} />
-            Přidat lead
+            <span className="hidden sm:inline">Přidat lead</span>
+            <span className="sm:hidden">Přidat</span>
           </Link>
           <Link
             href="/call"
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
+            className="inline-flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
           >
             <Phone size={16} />
             Call Mode
@@ -115,11 +116,11 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {statCards.map(({ key, label, icon: Icon, color, bg }) => (
           <div
             key={key}
-            className={`${bg} rounded-xl p-5 border border-gray-100`}
+            className={`${bg} rounded-xl p-3 sm:p-5 border border-gray-100`}
           >
             <div className="flex items-center justify-between mb-3">
               <Icon size={20} className={color} />
@@ -159,6 +160,7 @@ export default function DashboardPage() {
                     <p className="text-xs text-gray-500">
                       {formatPhone(lead.telefon)}
                       {lead.mesto && <span> · {lead.mesto}</span>}
+                      {lead.rating !== null && lead.rating !== undefined && <span> · {formatRating(lead.rating, lead.rating_count)}</span>}
                     </p>
                   </div>
                   <span

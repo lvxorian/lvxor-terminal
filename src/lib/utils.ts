@@ -127,15 +127,22 @@ export async function filterDuplicates(
 
 export function formatPhone(phone: string | null): string {
   if (!phone) return '—'
-  const digits = phone.replace(/[\s\u00a0\-()]/g, '')
-  if (digits.startsWith('+420') && digits.length === 12) {
-    const n = digits.slice(3)
-    return `+420 ${n.slice(0, 3)} ${n.slice(3, 6)} ${n.slice(6)}`
-  }
+  let digits = phone.replace(/[\s\u00a0\-()]/g, '')
+  if (digits.startsWith('+420')) digits = digits.slice(4)
+  if (digits.startsWith('00420')) digits = digits.slice(5)
   if (digits.length === 9) {
     return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`
   }
-  return phone
+  return digits || phone
+}
+
+export function phoneForTel(phone: string | null): string {
+  if (!phone) return ''
+  let digits = phone.replace(/[\s\u00a0\-()]/g, '')
+  if (digits.startsWith('+420')) return digits
+  if (digits.startsWith('00420')) return `+${digits.slice(2)}`
+  if (digits.length === 9) return `+420${digits}`
+  return digits
 }
 
 export function formatDate(date: string | null): string {
@@ -145,4 +152,12 @@ export function formatDate(date: string | null): string {
     month: 'short',
     year: 'numeric',
   })
+}
+
+export function formatRating(rating: number | null, count: number | null): string {
+  if (rating === null || rating === undefined) return '—'
+  if (count !== null && count !== undefined && count > 0) {
+    return `⭐ ${rating} (${count})`
+  }
+  return `⭐ ${rating}`
 }

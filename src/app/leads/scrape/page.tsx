@@ -250,6 +250,8 @@ export default function ScrapePage() {
           adresa: [r.streetAddress, r.postalCode, r.locality].filter(Boolean).join(', ') || null,
           ico: r.ico || null,
           datova_schranka: r.dataBoxId || null,
+          rating: r.ratingValue ?? null,
+          rating_count: r.ratingCount ?? null,
           zdroj: 'firmy_cz' as const,
           status: 'novy' as const,
           scrapnuto_dne: new Date().toISOString(),

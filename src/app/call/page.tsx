@@ -26,7 +26,7 @@ import {
   UserX,
   PartyPopper,
 } from 'lucide-react'
-import { formatPhone } from '@/lib/utils'
+import { formatPhone, phoneForTel, formatRating } from '@/lib/utils'
 import {
   type Lead,
   type CallScript,
@@ -281,8 +281,8 @@ function CallModePage() {
     return (
       <div className="animate-pulse space-y-6">
         <div className="h-8 bg-gray-200 rounded w-48" />
-        <div className="grid grid-cols-3 gap-6">
-          <div className="col-span-2 h-64 bg-gray-200 rounded-xl" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 h-64 bg-gray-200 rounded-xl" />
           <div className="h-64 bg-gray-200 rounded-xl" />
         </div>
       </div>
@@ -366,12 +366,19 @@ function CallModePage() {
                     <h2 className="text-lg font-semibold text-gray-900">
                       {currentLead.nazev_firmy}
                     </h2>
-                    {currentLead.obor && (
-                      <span className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
-                        <Building2 size={12} />
-                        {currentLead.obor}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {currentLead.obor && (
+                        <span className="text-xs text-gray-500 flex items-center gap-1">
+                          <Building2 size={12} />
+                          {currentLead.obor}
+                        </span>
+                      )}
+                      {currentLead.rating !== null && currentLead.rating !== undefined && (
+                        <span className="text-xs text-gray-500">
+                          {formatRating(currentLead.rating, currentLead.rating_count)}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${STATUS_COLORS[currentLead.status]}`}>
@@ -387,12 +394,12 @@ function CallModePage() {
               </div>
 
               <div className="px-5 py-4 space-y-3">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <p className="text-xs text-gray-500 mb-0.5">Telefon</p>
                     {currentLead.telefon ? (
                       <a
-                        href={`tel:${currentLead.telefon.replace(/\s/g, '')}`}
+                        href={`tel:${phoneForTel(currentLead.telefon)}`}
                         className="text-sm font-medium text-indigo-600 hover:text-indigo-700 flex items-center gap-1.5"
                       >
                         <Phone size={14} />
@@ -482,7 +489,7 @@ function CallModePage() {
                 </div>
               ) : (
                 <div className="px-5 py-4 border-t border-gray-100 space-y-5">
-                  <div className="flex items-center justify-between">
+<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
                       <div className={`w-3 h-3 rounded-full ${callActive ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
                       <span className="text-sm font-medium text-gray-700">
@@ -561,7 +568,7 @@ function CallModePage() {
         </div>
 
         <div className="lg:col-span-2">
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden sticky top-6">
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden sticky top-20 lg:top-6">
             <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <MessageSquare size={14} className="text-indigo-600" />
