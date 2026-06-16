@@ -3,6 +3,28 @@ import { getSupabase } from '@/lib/supabase'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
+export async function GET(
+  _request: Request,
+  context: RouteContext
+) {
+  const { id } = await context.params
+  const supabase = getSupabase()
+
+  const [leadRes, callLogsRes] = await Promise.all([
+    supabase.from('leads').select('*').eq('id', id).single(),
+    supabase.from('call_logs').select('*').eq('lead_id', id).order('volano_dne', { ascending: false }),
+  ])
+
+  if (leadRes.error) {
+    return NextResponse.json({ error: leadRes.error.message }, { status: 500 })
+  }
+
+  return NextResponse.json({
+    lead: leadRes.data,
+    callLogs: callLogsRes.data ?? [],
+  })
+}
+
 export async function PUT(
   request: Request,
   context: RouteContext

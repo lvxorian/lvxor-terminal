@@ -12,9 +12,15 @@ import {
   ChevronDown,
   Trash2,
   Users,
+  X,
+  Clock,
+  Building2,
+  Mail,
+  FileText,
+  Calendar,
 } from 'lucide-react'
-import { type Lead, type LeadStatus, STATUS_LABELS, STATUS_COLORS } from '@/lib/types'
-import { formatPhone, phoneForTel, formatRating } from '@/lib/utils'
+import { type Lead, type LeadStatus, type CallLog, type VysledekVolani, STATUS_LABELS, STATUS_COLORS, VYSLEDEK_LABELS, VYSLEDEK_COLORS } from '@/lib/types'
+import { formatPhone, phoneForTel, formatRating, formatDate } from '@/lib/utils'
 
 const statuses: LeadStatus[] = ['novy', 'vytoceno', 'zajim', 'nezajim', 'zavolat_zpet', 'nevolat', 'spatna_data']
 
@@ -25,6 +31,9 @@ export default function LeadsPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<LeadStatus | ''>('')
   const [showFilter, setShowFilter] = useState(false)
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
+  const [leadCallLogs, setLeadCallLogs] = useState<CallLog[]>([])
+  const [loadingDetail, setLoadingDetail] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
 
   const loadLeads = useCallback(async () => {
@@ -68,6 +77,27 @@ export default function LeadsPage() {
     setLeads((prev) =>
       prev.map((l) => (l.id === id ? { ...l, status } : l))
     )
+  }
+
+  async function openDetail(lead: Lead) {
+    setSelectedLead(lead)
+    setLoadingDetail(true)
+    setLeadCallLogs([])
+    try {
+      const res = await fetch(`/api/leads/${encodeURIComponent(lead.id)}`)
+      const data = await res.json()
+      if (data.lead) setSelectedLead(data.lead)
+      if (data.callLogs) setLeadCallLogs(data.callLogs)
+    } catch {
+      // silently fail
+    } finally {
+      setLoadingDetail(false)
+    }
+  }
+
+  function closeDetail() {
+    setSelectedLead(null)
+    setLeadCallLogs([])
   }
 
   const statusDot = (s: LeadStatus) => {
@@ -215,7 +245,8 @@ export default function LeadsPage() {
                   {leads.map((lead) => (
                     <tr
                       key={lead.id}
-                      className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors"
+                      onClick={() => openDetail(lead)}
+                      className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors cursor-pointer"
                     >
                       <td className="px-4 py-3">
                         <div className="font-medium text-sm text-gray-900">
@@ -229,6 +260,7 @@ export default function LeadsPage() {
                         {lead.telefon ? (
                           <a
                             href={`tel:${phoneForTel(lead.telefon)}`}
+                            onClick={(e) => e.stopPropagation()}
                             className="text-sm text-indigo-600 hover:text-indigo-700 flex items-center gap-1 whitespace-nowrap"
                           >
                             <Phone size={13} />
@@ -252,6 +284,7 @@ export default function LeadsPage() {
                             href={lead.web.startsWith('http') ? lead.web : `https://${lead.web}`}
                             target="_blank"
                             rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
                             className="text-sm text-green-600 hover:text-green-700 flex items-center gap-1"
                           >
                             <Globe size={13} />
@@ -271,6 +304,7 @@ export default function LeadsPage() {
                       <td className="px-4 py-3">
                         <select
                           value={lead.status}
+                          onClick={(e) => e.stopPropagation()}
                           onChange={(e) => updateStatus(lead.id, e.target.value as LeadStatus)}
                           className={`text-xs px-2 py-1 rounded-full font-medium border-0 cursor-pointer ${STATUS_COLORS[lead.status]}`}
                         >
@@ -283,13 +317,14 @@ export default function LeadsPage() {
                         <div className="flex items-center justify-end gap-1">
                           <Link
                             href={`/call?lead=${lead.id}`}
+                            onClick={(e) => e.stopPropagation()}
                             className="p-1.5 text-gray-400 hover:text-indigo-600 rounded transition-colors"
                             title="Volat"
                           >
                             <Phone size={15} />
                           </Link>
                           <button
-                            onClick={() => deleteLead(lead.id)}
+                            onClick={(e) => { e.stopPropagation(); deleteLead(lead.id) }}
                             className="p-1.5 text-gray-400 hover:text-red-600 rounded transition-colors"
                             title="Smazat"
                           >
@@ -306,7 +341,11 @@ export default function LeadsPage() {
 
           <div className="lg:hidden space-y-3">
             {leads.map((lead) => (
-              <div key={lead.id} className="bg-white rounded-xl border border-gray-200 p-4">
+              <div
+                key={lead.id}
+                onClick={() => openDetail(lead)}
+                className="bg-white rounded-xl border border-gray-200 p-4 cursor-pointer hover:bg-gray-50/50 transition-colors"
+              >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <h3 className="text-sm font-semibold text-gray-900 truncate">{lead.nazev_firmy}</h3>
@@ -328,6 +367,7 @@ export default function LeadsPage() {
                   {lead.telefon && (
                     <a
                       href={`tel:${phoneForTel(lead.telefon)}`}
+                      onClick={(e) => e.stopPropagation()}
                       className="flex items-center gap-1 text-indigo-600 hover:text-indigo-700 whitespace-nowrap"
                     >
                       <Phone size={12} />
@@ -345,6 +385,7 @@ export default function LeadsPage() {
                       href={lead.web.startsWith('http') ? lead.web : `https://${lead.web}`}
                       target="_blank"
                       rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
                       className="flex items-center gap-1 text-green-600 hover:text-green-700"
                     >
                       <Globe size={12} />
@@ -361,6 +402,7 @@ export default function LeadsPage() {
                 <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-100">
                   <select
                     value={lead.status}
+                    onClick={(e) => e.stopPropagation()}
                     onChange={(e) => updateStatus(lead.id, e.target.value as LeadStatus)}
                     className={`text-xs px-2 py-1 rounded-full font-medium border-0 cursor-pointer ${STATUS_COLORS[lead.status]}`}
                   >
@@ -371,12 +413,13 @@ export default function LeadsPage() {
                   <div className="flex items-center gap-1">
                     <Link
                       href={`/call?lead=${lead.id}`}
+                      onClick={(e) => e.stopPropagation()}
                       className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
                     >
                       <Phone size={16} />
                     </Link>
                     <button
-                      onClick={() => deleteLead(lead.id)}
+                      onClick={(e) => { e.stopPropagation(); deleteLead(lead.id) }}
                       className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                     >
                       <Trash2 size={16} />
@@ -387,6 +430,141 @@ export default function LeadsPage() {
             ))}
           </div>
         </>
+      )}
+
+      {selectedLead && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center sm:items-center" onClick={closeDetail}>
+          <div className="fixed inset-0 bg-black/50" />
+          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 my-4 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-5 py-4 flex items-center justify-between z-10">
+              <h2 className="text-lg font-bold text-gray-900 truncate pr-4">{selectedLead.nazev_firmy}</h2>
+              <button onClick={closeDetail} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors shrink-0">
+                <X size={20} className="text-gray-500" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-5">
+              <div>
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Informace o leadu</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                  {selectedLead.telefon && (
+                    <div>
+                      <p className="text-xs text-gray-500 mb-0.5">Telefon</p>
+                      <a href={`tel:${phoneForTel(selectedLead.telefon)}`} className="text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
+                        <Phone size={13} /> {formatPhone(selectedLead.telefon)}
+                      </a>
+                    </div>
+                  )}
+                  {selectedLead.email && (
+                    <div>
+                      <p className="text-xs text-gray-500 mb-0.5">Email</p>
+                      <p className="text-gray-700 flex items-center gap-1"><Mail size={13} /> {selectedLead.email}</p>
+                    </div>
+                  )}
+                  {selectedLead.mesto && (
+                    <div>
+                      <p className="text-xs text-gray-500 mb-0.5">Město</p>
+                      <p className="text-gray-700 flex items-center gap-1"><MapPin size={13} /> {selectedLead.mesto}</p>
+                    </div>
+                  )}
+                  {selectedLead.obor && (
+                    <div>
+                      <p className="text-xs text-gray-500 mb-0.5">Obor</p>
+                      <p className="text-gray-700 flex items-center gap-1"><Building2 size={13} /> {selectedLead.obor}</p>
+                    </div>
+                  )}
+                  {(selectedLead.rating !== null && selectedLead.rating !== undefined) && (
+                    <div>
+                      <p className="text-xs text-gray-500 mb-0.5">Hodnocení</p>
+                      <p className="text-gray-700">{formatRating(selectedLead.rating, selectedLead.rating_count)}</p>
+                    </div>
+                  )}
+                  {selectedLead.ico && (
+                    <div>
+                      <p className="text-xs text-gray-500 mb-0.5">IČO</p>
+                      <p className="text-gray-700">{selectedLead.ico}</p>
+                    </div>
+                  )}
+                  {selectedLead.adresa && (
+                    <div className="sm:col-span-2">
+                      <p className="text-xs text-gray-500 mb-0.5">Adresa</p>
+                      <p className="text-gray-700">{selectedLead.adresa}</p>
+                    </div>
+                  )}
+                  {selectedLead.kontaktni_osoba && (
+                    <div>
+                      <p className="text-xs text-gray-500 mb-0.5">Kontaktní osoba</p>
+                      <p className="text-gray-700">{selectedLead.kontaktni_osoba}</p>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-xs text-gray-500 mb-0.5">Zdroj</p>
+                    <p className="text-gray-700">{selectedLead.zdroj === 'firmy_cz' ? 'Firmy.cz' : selectedLead.zdroj === 'ares' ? 'ARES' : 'Ruční'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-0.5">Status</p>
+                    <span className={`inline-block text-xs px-2 py-1 rounded-full font-medium ${STATUS_COLORS[selectedLead.status]}`}>
+                      {STATUS_LABELS[selectedLead.status]}
+                    </span>
+                  </div>
+                  {selectedLead.web && (
+                    <div className="sm:col-span-2">
+                      <p className="text-xs text-gray-500 mb-0.5">Web</p>
+                      <a href={selectedLead.web.startsWith('http') ? selectedLead.web : `https://${selectedLead.web}`} target="_blank" rel="noopener noreferrer" className="text-green-600 hover:text-green-700 flex items-center gap-1">
+                        <Globe size={13} /> {selectedLead.web}
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {selectedLead.poznamky && (
+                <div>
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <FileText size={14} /> Poznámky k leadu
+                  </h3>
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <p className="text-sm text-gray-700 whitespace-pre-line">{selectedLead.poznamky}</p>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                  <Phone size={14} /> Historie hovorů
+                  {leadCallLogs.length > 0 && <span className="text-gray-400 font-normal">({leadCallLogs.length})</span>}
+                </h3>
+
+                {loadingDetail ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full mx-auto" />
+                  </div>
+                ) : leadCallLogs.length === 0 ? (
+                  <p className="text-sm text-gray-500 text-center py-4">Žádné hovory</p>
+                ) : (
+                  <div className="space-y-3">
+                    {leadCallLogs.map((log) => (
+                      <div key={log.id} className="bg-gray-50 rounded-lg p-3 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${VYSLEDEK_COLORS[log.vysledek as VysledekVolani] ?? 'bg-gray-200 text-gray-700'}`}>
+                            {VYSLEDEK_LABELS[log.vysledek as VysledekVolani] ?? log.vysledek}
+                          </span>
+                          <div className="flex items-center gap-3 text-xs text-gray-500">
+                            <span className="flex items-center gap-1"><Calendar size={11} /> {formatDate(log.volano_dne)}</span>
+                            <span className="flex items-center gap-1"><Clock size={11} /> {log.delka_sekundy}s</span>
+                          </div>
+                        </div>
+                        {log.poznamka && (
+                          <p className="text-sm text-gray-700 whitespace-pre-line">{log.poznamka}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
