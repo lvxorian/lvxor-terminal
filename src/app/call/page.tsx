@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, Suspense, useRef, useCallback } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   Phone,
@@ -100,6 +100,7 @@ function Confetti() {
 function CallModePage() {
   const searchParams = useSearchParams()
   const leadIdParam = searchParams.get('lead')
+  const router = useRouter()
 
   const [allLeads, setAllLeads] = useState<Lead[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -168,7 +169,9 @@ function CallModePage() {
       return new Date(a.vytvoreno).getTime() - new Date(b.vytvoreno).getTime()
     })
 
-  const currentLead = callQueue[currentIndex] as Lead | undefined
+  const currentLead = leadIdParam
+    ? allLeads.find((l) => l.id === leadIdParam)
+    : (callQueue[currentIndex] as Lead | undefined)
 
   useEffect(() => {
     let interval: NodeJS.Timeout
@@ -221,6 +224,11 @@ function CallModePage() {
     setAllLeads((prev) => prev.map((l) => (l.id === currentLead.id ? { ...l, status: selectedStatus } : l)))
 
     resetCallState()
+
+    if (leadIdParam) {
+      router.push('/call')
+      return
+    }
 
     const nextIdx = currentIndex + 1
     if (nextIdx >= callQueue.length) {
