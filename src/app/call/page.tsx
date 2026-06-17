@@ -258,10 +258,11 @@ function CallModePage() {
   async function saveScript() {
     if (!activeScript) return
     const res = await fetch('/api/scripts', {
-      method: 'POST',
+      method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        ...activeScript,
+        id: activeScript.id,
+        nazev: activeScript.nazev,
         obsah: editedContent,
       }),
     })
